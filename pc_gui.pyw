@@ -2,6 +2,7 @@ import tkinter as tk
 import tkinter.font as tk_font
 import dbd
 import image_handler as imh
+from typing import List
 
 KILLER_LIST_PATH = "killers\\killers.txt"
 SURVIVOR_LIST_PATH = "survivors\\survivors.txt"
@@ -99,14 +100,14 @@ class Window:
 
         self.perk_config_button = tk.Button(self.root,
                                             text="Configure perk pool",
-                                            command=self.configure_perk_pool,
+                                            command=lambda : self.configure_pool("perk"),
                                             bg=BACKGROUND_COLOR,
                                             fg=FOREGROUND_COLOR,
                                             font=FONT)
 
         self.character_config_button = tk.Button(self.root,
                                                  text="Configure character pool",
-                                                 command=self.configure_character_pool,
+                                                 command=lambda : self.configure_pool("character"),
                                                  bg=BACKGROUND_COLOR,
                                                  fg=FOREGROUND_COLOR,
                                                  font=FONT)
@@ -217,103 +218,121 @@ class Window:
                     self.perk_image_labels[i]["image"] = self.survivor_perks_images[build[i]]
 
 
-    def configure_perk_pool(self) -> None:
+    def configure_pool(self, _type: str) -> None:
         
         config_window = tk.Toplevel(self.root, bg=BACKGROUND_COLOR)
         config_window.title("Configure perk pool")
         config_window.iconbitmap(ICON_PATH)
 
-        optionbox = tk.Listbox(config_window,
-                               bg=BACKGROUND_COLOR,
-                               fg=FOREGROUND_COLOR,
-                               width=40,
-                               height=20,
-                               selectbackground=ACTIVE_BG_COLOR,
-                               font=FONT)
+        config_frame = tk.Frame(config_window)
+        config_canvas = tk.Canvas(config_frame)
+        config_scrollbar = tk.Scrollbar(config_frame, orient="vertical", command=config_canvas.yview)
 
-        delete_button = tk.Button(config_window,
-                                  text="Delete selected",
-                                  command=lambda: self._delete_perk_from_pool(optionbox),
+        config_window.grid_columnconfigure(0, weight=1)
+        config_window.grid_columnconfigure(1, weight=1)
+        config_window.grid_rowconfigure(0, weight=1)
+        config_window.grid_rowconfigure(1, weight=1)
+        config_window.grid_rowconfigure(2, weight=1)
+
+        config_frame.grid_columnconfigure(0, weight=1)
+        config_frame.grid_columnconfigure(1, weight=1)
+        config_frame.grid_rowconfigure(0, weight=1)
+
+        pool_widgets = []
+        control_variables = []
+
+        item_frame = tk.Frame(config_frame)
+        item_frame.grid_columnconfigure(0, weight=1)
+        item_frame.grid_columnconfigure(1, weight=1)
+
+        check_button = tk.Button(config_window,
+                                  text="Check all",
+                                  command=lambda: self._check_all(pool_widgets),
                                   bg=BACKGROUND_COLOR,
                                   fg=FOREGROUND_COLOR,
                                   font=FONT)
 
-        optionbox.pack()
-        delete_button.pack(padx=10, pady=20)
+        uncheck_button = tk.Button(config_window,
+                                  text="Un-check all",
+                                  command=lambda: self._uncheck_all(pool_widgets),
+                                  bg=BACKGROUND_COLOR,
+                                  fg=FOREGROUND_COLOR,
+                                  font=FONT)
 
-        self._show_pool(optionbox, "perk")
+        save_button = tk.Button(config_window,
+                                  text="Save pool",
+                                  command=lambda: self._save_pool(pool_widgets),
+                                  bg=BACKGROUND_COLOR,
+                                  fg=FOREGROUND_COLOR,
+                                  font=FONT)
 
-    def configure_character_pool(self) -> None:
+
+        self._load_pool(item_frame, _type, pool_widgets, control_variables)
+
+        config_canvas.create_window(0, 0, window=item_frame)
+        item_frame.update_idletasks()
+
+        config_canvas.configure(scrollregion=config_canvas.bbox('all'), 
+                                yscrollcommand=config_scrollbar.set)
         
-        config_window = tk.Toplevel(self.root, bg=BACKGROUND_COLOR)
-        config_window.title("Configure character pool")
-        config_window.iconbitmap(ICON_PATH)
+        # --- Grid onto toplevel
+        config_frame.grid(row=0, column=0, sticky="NS", rowspan=3)
+        check_button.grid(row=0, column=1)
+        uncheck_button.grid(row=1, column=1)
+        save_button.grid(row=2, column=1)
+        # ---
 
-        optionbox = tk.Listbox(config_window,
-                               bg=BACKGROUND_COLOR,
-                               fg=FOREGROUND_COLOR,
-                               width=40,
-                               height=20,
-                               selectbackground=ACTIVE_BG_COLOR,
-                               font=FONT)
+        # --- Grid onto config_frame
+        config_canvas.grid(row=0, column=0, sticky="NEWS")
+        config_scrollbar.grid(row=0, column=1, sticky="NES")
+        # ---
 
-        delete_button = tk.Button(config_window,
-                                  text="Delete selected",
-                                  command=lambda: self._delete_character_from_pool(optionbox),
-                                  bg=BACKGROUND_COLOR,
-                                  fg=FOREGROUND_COLOR,
-                                  font=FONT)
-
-        optionbox.pack()
-        delete_button.pack(padx=10, pady=20)
-
-        self._show_pool(optionbox, "character")
-
-    def _show_pool(self, optionbox: tk.Listbox, _type: str) -> None:
+    def _load_pool(self,
+                   window: tk.Frame,
+                   _type: str,
+                   widget_list: List[tk.Checkbutton],
+                   control_list: List[tk.IntVar]) -> None:
 
         if _type == "perk":
 
             if self.character_type.get() == "survivor":
 
-                for perk in self.sperk_pool:
-                    optionbox.insert(tk.END, perk)
+                control_list = [tk.IntVar() for _ in range(len(self.sperk_pool))]
+                self._create_config_widgets(window,
+                                            self.sperk_pool,
+                                            widget_list,
+                                            control_list,
+                                            self.survivor_perks_images)
+
 
             elif self.character_type.get() == "killer":
 
-                for perk in self.kperk_pool:
-                    optionbox.insert(tk.END, perk)
+                control_list = [tk.IntVar() for _ in range(len(self.kperk_pool))]
+                self._create_config_widgets(window,
+                                            self.kperk_pool,
+                                            widget_list,
+                                            control_list,
+                                            self.killer_perks_images)
 
         elif _type == "character":
 
             if self.character_type.get() == "survivor":
 
-                for char in self.survivor_pool:
-                    optionbox.insert(tk.END, char)
+                control_list = [tk.IntVar() for _ in range(len(self.survivor_pool))]
+                self._create_config_widgets(window,
+                                            self.survivor_pool,
+                                            widget_list,
+                                            control_list,
+                                            self.survivor_images)
 
             elif self.character_type.get() == "killer":
 
-                for char in self.killer_pool:
-                    optionbox.insert(tk.END, char)
-
-    def _delete_perk_from_pool(self, optionbox: tk.Listbox) -> None:
-        
-        selected = optionbox.curselection()
-        optionbox.delete(selected[0])
-
-        if self.character_type.get() == "survivor":
-            self.sperk_pool.pop(selected[0])
-        elif self.character_type.get() == "killer":
-            self.kperk_pool.pop(selected[0])
-
-    def _delete_character_from_pool(self, optionbox: tk.Listbox) -> None:
-
-        selected = optionbox.curselection()
-        optionbox.delete(selected[0])
-
-        if self.character_type.get() == "survivor":
-            self.survivor_pool.pop(selected[0])
-        elif self.character_type.get() == "killer":
-            self.killer_pool.pop(selected[0])
+                control_list = [tk.IntVar() for _ in range(len(self.killer_pool))]
+                self._create_config_widgets(window,
+                                            self.killer_pool,
+                                            widget_list,
+                                            control_list,
+                                            self.killer_images)
 
     def restore_pools(self) -> None:
         
@@ -354,6 +373,24 @@ class Window:
                   fg=FOREGROUND_COLOR).pack(pady=5)
 
 
+    def _save_pool(self,
+                   pool: List[str],
+                   checkbuttons: List[tk.Checkbutton],
+                   control_variables: List[tk.IntVar],
+                   _type: str) -> None:
+        
+        pass
+
+    def _check_all(self, checkbuttons: List[tk.Checkbutton]) -> None:
+        
+        for check in checkbuttons:
+            check.select()
+
+    def _uncheck_all(self, checkbuttons: List[tk.Checkbutton]) -> None:
+
+        for check in checkbuttons:
+            check.deselect()
+
     def _restore_killer(self) -> None:
 
         self.killer_pool = dbd.load_data(KILLER_LIST_PATH)
@@ -369,6 +406,22 @@ class Window:
     def _restore_sperks(self) -> None:
 
         self.sperk_pool = dbd.load_data(SURVIVOR_PERKS_PATH)
+
+    def _create_config_widgets(self,
+                        window: tk.Frame,
+                        pool: List[str],
+                        widget_list: List[tk.Checkbutton],
+                        control_list: List[tk.IntVar],
+                        image_list: List["ImageTk.PhotoImage"]):
+
+        for i, item in enumerate(pool):
+
+            window.grid_rowconfigure(i, weight=1)
+            button = tk.Checkbutton(window, text=item, variable=control_list[i])
+            button.grid(row=i, column=0, sticky="NEWS")
+            tk.Label(window, image=image_list[item]).grid(row=i, column=1)
+
+            widget_list.append(button)
 
     def show_info(self) -> None:
 
