@@ -16,6 +16,6 @@ def get_tk_image(image: Image) -> ImageTk.PhotoImage:
     return ImageTk.PhotoImage(image)
 
 
-def get_images(folder: str, name_list: List[str]) -> List["Image"]:
+def get_images(folder: str, name_list: List[str], new_dimensions: Tuple[int, int]) -> List["Image"]:
     
-    return [get_tk_image(resize_image((70, 70), load_image(f"{folder}\\{name}.webp"))) for name in name_list]
+    return [get_tk_image(resize_image(new_dimensions, load_image(f"{folder}\\{name}.webp"))) for name in name_list]
