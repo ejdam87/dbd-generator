@@ -30,11 +30,14 @@ ACTIVE_FG_COLOR = "#00FF00"
 # ---
 
 # --- Image sizes
-PERK_IM_WIDTH = 80
-PERK_IM_HEIGHT = 80
+IM_WIDTH = 80
+IM_HEIGHT = 80
 
-CHAR_IM_WIDTH = 150
-CHAR_IM_HEIGHT = 150
+BIG_IM_WIDTH = 150
+BIG_IM_HEIGHT = 150
+
+BIG_SIZE = (BIG_IM_WIDTH, BIG_IM_HEIGHT)
+SMALL_SIZE = (IM_WIDTH, IM_HEIGHT)
 # ---
 
 FONT = ("Helvetica", 12)
@@ -58,16 +61,9 @@ class Window:
         # ---
 
         # --- Loading assets
-        im = imh.load_image("question_mark.png")
-        self.small_qm_image = imh.get_tk_image(
-                                               imh.resize_image((PERK_IM_WIDTH, PERK_IM_HEIGHT),
-                                               im)
-                                              )
-
-        self.big_qm_image = imh.get_tk_image(
-                                             imh.resize_image((CHAR_IM_WIDTH, CHAR_IM_HEIGHT),
-                                             im)
-                                            )
+        self.qm_im = imh.load_image("question_mark.png")
+        self.big_qm = imh.get_tk_image(imh.resize_image(BIG_SIZE, self.qm_im))
+        self.small_qm = imh.get_tk_image(imh.resize_image(SMALL_SIZE, self.qm_im))
 
         self.kperk_pool = dbd.load_data(KILLER_PERKS_PATH)
         self.sperk_pool = dbd.load_data(SURVIVOR_PERKS_PATH)
@@ -79,49 +75,19 @@ class Window:
         self.base_killer_pool = self.killer_pool[:]
         self.base_survivor_pool = self.survivor_pool[:]
 
-        self.killer_images = dict(
-                                  zip(
-                                      self.killer_pool,
-                                      imh.get_images(
-                                                     KILLER_LIST_IMAGES,
-                                                     self.killer_pool,
-                                                     (CHAR_IM_WIDTH, CHAR_IM_HEIGHT)
-                                                    )
-                                     )
-                                 )
+        self.big_ims = {}
+        self.small_ims = {}
 
-        self.killer_perks_images = dict(
-                                        zip(
-                                            self.kperk_pool,
-                                            imh.get_images(
-                                                           KILLER_PERKS_IMAGES,
-                                                           self.kperk_pool,
-                                                           (PERK_IM_WIDTH, PERK_IM_HEIGHT)
-                                                          )
-                                           )
-                                       )
+        zip_pool = []
+        for item_pool, path in [(self.sperk_pool, SURVIVOR_PERKS_IMAGES),
+                     (self.survivor_pool, SURVIVOR_LIST_IMAGES),
+                     (self.killer_pool, KILLER_LIST_IMAGES),
+                     (self.kperk_pool, KILLER_PERKS_IMAGES)]:
 
-        self.survivor_images = dict(
-                                    zip(
-                                        self.survivor_pool,
-                                        imh.get_images(
-                                                       SURVIVOR_LIST_IMAGES,
-                                                       self.survivor_pool,
-                                                       (CHAR_IM_WIDTH, CHAR_IM_HEIGHT)
-                                                      )
-                                       )
-                                   )
+            zip_pool += list(zip(item_pool, imh.get_images(path, item_pool)))
 
-        self.survivor_perks_images = dict(
-                                          zip(
-                                              self.sperk_pool,
-                                              imh.get_images(
-                                                             SURVIVOR_PERKS_IMAGES,
-                                                             self.sperk_pool,
-                                                             (PERK_IM_WIDTH, PERK_IM_HEIGHT)
-                                                            )
-                                             )
-                                         )
+
+        self.images = dict(zip_pool)
         # ---
 
         # --- Global stringVars
@@ -197,7 +163,9 @@ class Window:
                                         fg=FOREGROUND_COLOR,
                                         font=FONT)
 
-        self.character_image_label = tk.Label(self.root, image=self.big_qm_image, bg=BACKGROUND_COLOR)
+        self.character_image_label = tk.Label(self.root,
+                                              image=self.big_qm,
+                                              bg=BACKGROUND_COLOR)
 
         self.perk_labels = [
 
@@ -213,7 +181,7 @@ class Window:
 
         self.perk_image_labels = [
                                     tk.Label(self.root, 
-                                             image=self.small_qm_image,
+                                             image=self.small_qm,
                                              bg=BACKGROUND_COLOR)
 
                                     for i in range(4)
@@ -258,13 +226,21 @@ class Window:
 
             killer = dbd.get_character(self.killer_pool)
             self.character_picked.set(killer)
-            self.character_image_label["image"] = self.killer_images[killer]
+
+            if killer not in self.big_ims:
+                self.big_ims[killer] = imh.get_tk_image(imh.resize_image(BIG_SIZE, self.images[killer]))
+
+            self.character_image_label["image"] = self.big_ims[killer]
             
         elif self.character_type.get() == CharacterTypes.SURVIVOR:
 
             survivor = dbd.get_character(self.survivor_pool)
+
+            if survivor not in self.big_ims:
+                self.big_ims[survivor] = imh.get_tk_image(imh.resize_image(BIG_SIZE, self.images[survivor]))
+
             self.character_picked.set(survivor)
-            self.character_image_label["image"] = self.survivor_images[survivor]
+            self.character_image_label["image"] = self.big_ims[survivor]
 
     def show_build(self) -> None:
         """
@@ -285,10 +261,14 @@ class Window:
 
                 perk.set(build[i])
 
-                if self.character_type.get() == CharacterTypes.KILLER:
-                    self.perk_image_labels[i]["image"] = self.killer_perks_images[build[i]]
-                else:
-                    self.perk_image_labels[i]["image"] = self.survivor_perks_images[build[i]]
+                if build[i] not in self.small_ims:
+
+                    if self.character_type.get() == CharacterTypes.KILLER:
+                        self.small_ims[build[i]] = imh.get_tk_image(imh.resize_image(SMALL_SIZE, self.images[build[i]]))
+                    else:
+                        self.small_ims[build[i]] = imh.get_tk_image(imh.resize_image(SMALL_SIZE, self.images[build[i]]))
+
+                self.perk_image_labels[i]["image"] = self.small_ims[build[i]]
 
 
     def configure_pool(self, _type: str) -> None:
@@ -324,7 +304,7 @@ class Window:
         config_frame.grid_columnconfigure(1, weight=1)
         config_frame.grid_rowconfigure(0, weight=1)
 
-        image_pool, item_pool, base_pool = self._get_pools(_type)
+        item_pool, base_pool = self._get_pools(_type)
         pool_widgets = []
         control_variables = [tk.IntVar() for _ in range(len(base_pool))]
 
@@ -359,8 +339,7 @@ class Window:
                                     base_pool,
                                     item_pool,
                                     pool_widgets,
-                                    control_variables,
-                                    image_pool)
+                                    control_variables)
 
         config_canvas.create_window(0, 0, window=item_frame)
         item_frame.update_idletasks()
@@ -387,8 +366,7 @@ class Window:
                         base_pool: List[str],
                         pool: List[str],
                         widget_list: List[tk.Checkbutton],
-                        control_list: List[tk.IntVar],
-                        image_list: List["ImageTk.PhotoImage"]):
+                        control_list: List[tk.IntVar]):
         """
         Method to list item checkboxes with images
         """
@@ -411,8 +389,11 @@ class Window:
 
             button.grid(row=i, column=0, sticky="NEWS")
 
+            if item not in self.small_ims:
+                self.small_ims[item] = imh.get_tk_image(imh.resize_image(SMALL_SIZE, self.images[item]))
+
             tk.Label(window,
-                     image=image_list[item],
+                     image=self.small_ims[item],
                      bg=BACKGROUND_COLOR).grid(row=i, column=1)
 
             widget_list.append(button)
@@ -435,24 +416,24 @@ class Window:
                 item_pool.append(check.cget("text"))
 
 
-    def _get_pools(self, _type: int) -> Tuple[List[tk.PhotoImage], List[str], List[str]]:
+    def _get_pools(self, _type: int) -> Tuple[List[str], List[str]]:
         """
         Method to get image pool, current selected pool and base pool based on type of item
         """
 
         if _type == ItemTypes.PERK.value:
             if self.character_type.get() == CharacterTypes.SURVIVOR:
-                return self.survivor_perks_images, self.sperk_pool, self.base_sperk_pool
+                return self.sperk_pool, self.base_sperk_pool
 
             if self.character_type.get() == CharacterTypes.KILLER:
-                return self.killer_perks_images, self.kperk_pool, self.base_kperk_pool
+                return self.kperk_pool, self.base_kperk_pool
 
         if _type == ItemTypes.CHARACTER.value:
             if self.character_type.get() == CharacterTypes.SURVIVOR:
-                return self.survivor_images, self.survivor_pool, self.base_survivor_pool
+                return self.survivor_pool, self.base_survivor_pool
 
             if self.character_type.get()== CharacterTypes.KILLER:
-                return self.killer_images, self.killer_pool, self.base_killer_pool
+                return self.killer_pool, self.base_killer_pool
 
     def _check_all(self, checkbuttons: List[tk.Checkbutton]) -> None:
         
