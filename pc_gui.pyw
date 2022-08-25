@@ -3,7 +3,7 @@ import tkinter.font as tk_font
 import dbd
 from char_types import CharacterTypes, ItemTypes
 import image_handler as imh
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 
 # --- Paths to data-files
@@ -91,6 +91,7 @@ class Window:
         # ---
 
         # --- Global stringVars
+        self.status = tk.StringVar()
         self.character_picked = tk.StringVar()  # Picked character name
         self.character_type = tk.IntVar()    # Killer / Survivor
         self.perks = [tk.StringVar() for _ in range(4)] # Picked perks
@@ -188,11 +189,16 @@ class Window:
 
                                  ]
 
+        self.status_bar = tk.Label(self.root,
+                                   textvariable=self.status,
+                                   bg=BACKGROUND_COLOR,
+                                   fg=FOREGROUND_COLOR,
+                                   font=FONT)
         # ---
 
         # --- Widget placement
         columns = 4
-        rows = 9
+        rows = 10
 
         for i in range(columns):
             self.root.grid_columnconfigure(i, weight=1)
@@ -210,17 +216,21 @@ class Window:
         for i, im_label in enumerate(self.perk_image_labels):
             im_label.grid(row=6, column=i)
         for i, label in enumerate(self.perk_labels):
-            label.grid(row=7, column=i)
+            label.grid(row=7, column=i, pady=10)
 
         self.perk_config_button.grid(row=8, column=2, pady=10, columnspan=2)
         self.character_config_button.grid(row=8, column=1, pady=10)
         self.info_button.grid(row=8, column=0, pady=10)
+        self.status_bar.grid(row=9, column=0, pady=10, columnspan=4)
         # ---
 
     def show_character(self) -> None:
         """
         Method to show selected character
         """
+
+        if not self._check_picked():
+            return
 
         if self.character_type.get() == CharacterTypes.KILLER:
 
@@ -247,6 +257,9 @@ class Window:
         Method to show selected perks
         """
 
+        if not self._check_picked():
+            return
+
         build = []
 
         if self.character_type.get() == CharacterTypes.KILLER:
@@ -255,26 +268,39 @@ class Window:
         elif self.character_type.get() == CharacterTypes.SURVIVOR:
             build = dbd.get_build(self.sperk_pool)
 
-        if build != []:
 
-            for i, perk in enumerate(self.perks):
+        for i, perk in enumerate(self.perks):
 
-                perk.set(build[i])
+            if i >= len(build):
+                self.perk_image_labels[i]["image"] = self.small_qm
+                perk.set("")
+                continue
 
-                if build[i] not in self.small_ims:
+            perk.set(build[i])
 
-                    if self.character_type.get() == CharacterTypes.KILLER:
-                        self.small_ims[build[i]] = imh.get_tk_image(imh.resize_image(SMALL_SIZE, self.images[build[i]]))
-                    else:
-                        self.small_ims[build[i]] = imh.get_tk_image(imh.resize_image(SMALL_SIZE, self.images[build[i]]))
+            if build[i] not in self.small_ims:
 
-                self.perk_image_labels[i]["image"] = self.small_ims[build[i]]
+                if self.character_type.get() == CharacterTypes.KILLER:
+                    self.small_ims[build[i]] = imh.get_tk_image(imh.resize_image(SMALL_SIZE, self.images[build[i]]))
+                else:
+                    self.small_ims[build[i]] = imh.get_tk_image(imh.resize_image(SMALL_SIZE, self.images[build[i]]))
+
+            self.perk_image_labels[i]["image"] = self.small_ims[build[i]]
 
 
     def configure_pool(self, _type: str) -> None:
         """
         Method to handle all the pool configuration
         """
+
+        if not self._check_picked():
+            return
+
+        pools = self._get_pools(_type)
+        item_pool, base_pool = pools
+        pool_widgets = []
+        control_variables = [tk.IntVar() for _ in range(len(base_pool))]
+
 
         config_window = tk.Toplevel(self.root, bg=BACKGROUND_COLOR)
         config_window.geometry(f"{INITIAL_WIDTH}x{INITIAL_HEIGHT}")
@@ -303,10 +329,6 @@ class Window:
         config_frame.grid_columnconfigure(0, weight=1)
         config_frame.grid_columnconfigure(1, weight=1)
         config_frame.grid_rowconfigure(0, weight=1)
-
-        item_pool, base_pool = self._get_pools(_type)
-        pool_widgets = []
-        control_variables = [tk.IntVar() for _ in range(len(base_pool))]
 
         item_frame = tk.Frame(config_frame,
                               bg=BACKGROUND_COLOR)
@@ -406,7 +428,7 @@ class Window:
         Method to save checkbutton values to pool
         """
 
-        item_pool = self._get_pools(_type)[1]
+        item_pool = self._get_pools(_type)[0]
 
         for i, check in enumerate(checkbuttons):
 
@@ -416,7 +438,7 @@ class Window:
                 item_pool.append(check.cget("text"))
 
 
-    def _get_pools(self, _type: int) -> Tuple[List[str], List[str]]:
+    def _get_pools(self, _type: int) -> Optional[ Tuple[ List[str], List[str] ] ]:
         """
         Method to get image pool, current selected pool and base pool based on type of item
         """
@@ -451,6 +473,15 @@ class Window:
         """
 
         canvas.yview_scroll( int( -1 * (event.delta / 120) ), "units")
+
+    def _check_picked(self) -> bool:
+
+        if self.character_type.get() == 0:
+            self.status.set("You have to pick character (e.g. killer / survivor)")
+            return False
+
+        self.status.set("")
+        return True
 
     def show_info(self) -> None:
         """

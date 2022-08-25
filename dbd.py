@@ -25,6 +25,10 @@ def get_character(character_list: List[str]) -> str:
 def get_build(perk_list: List[str]) -> List[str]:
     
     random.shuffle(perk_list)
+
+    if len(perk_list) < 4:
+        return perk_list
+
     return [perk_list[i] for i in range(4)]
 
 
